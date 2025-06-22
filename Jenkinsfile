@@ -12,6 +12,10 @@ pipeline {
     // L'ID 'github-pat' DOIT correspondre à l'ID que vous avez donné à votre Secret text credential dans Jenkins.
     environment {
         GITHUB_TOKEN = credentials('github-pat') // Utilise l'ID 'github-pat' que vous avez défini.
+        // AJOUT : Ajoute les chemins de Python et PowerShell au PATH pour le pipeline Jenkins
+        // REMPLACEZ 'C:\VOTRE\CHEMIN\VERS\PYTHON' et 'C:\VOTRE\CHEMIN\VERS\POWERSHELL' par les VRAIS chemins que vous avez trouvés.
+        // N'oubliez pas d'inclure le dossier 'Scripts' de Python si `pip` est nécessaire !
+        PATH = "C:\\Users\\sihem\\AppData\\Local\\Programs\\Python\\Python39;C:\\Users\\sihem\\AppData\\Local\\Programs\\Python\\Python39\\Scripts;C:\\Windows\\System32\\WindowsPowerShell\\v1.0;${env.PATH}"
     }
 
     // La section 'stages' contient les différentes phases de votre pipeline CI/CD.
@@ -99,11 +103,9 @@ pipeline {
         failure {
             echo 'Build failed! Handling the failed commit...'
             script {
-                // Assurez-vous que Python est bien installé sur la machine où tourne votre agent Jenkins, et que la commande python est accessible via le PATH système.
-
                 // Génère un identifiant unique pour la branche d'échec (horodatage + numéro de build Jenkins).
                 // Utilise 'powershell' pour obtenir l'horodatage sur Windows.
-                def uniqueId = powershell(returnStdout: true, script: 'Get-Date -Format माननेMMddHHmmss').trim()
+                def uniqueId = powershell(returnStdout: true, script: 'Get-Date -Format yyyyMMddHHmmss').trim()
                 def failureBranchName = "failures/${env.BUILD_NUMBER}-${uniqueId}" // Exemple: failures/15-20250622173000
 
                 // Récupère le SHA (identifiant unique) du commit qui a été testé et qui a causé l'échec.

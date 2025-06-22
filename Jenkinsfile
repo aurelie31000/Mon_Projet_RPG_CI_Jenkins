@@ -71,7 +71,8 @@ pipeline {
                     bat 'git config user.name "Jenkins CI Bot"'
 
                     // Récupère la dernière version de 'main' pour s'assurer qu'elle est à jour localement.
-                    // CORRECTION : Changement de 'principal' à 'main' pour le nom de branche.
+                    // CORRECTION : S'assurer que la branche 'main' existe sur GitHub.
+                    // Si votre branche principale est 'master' sur GitHub, changez 'main' en 'master' ici.
                     bat 'git checkout main'
                     bat 'git pull origin main'
 
@@ -105,8 +106,9 @@ pipeline {
             echo 'Build failed! Handling the failed commit...'
             script {
                 // Génère un identifiant unique pour la branche d'échec (horodatage + numéro de build Jenkins).
-                // Utilise la commande 'bat' pour exécuter 'powershell.exe' avec son chemin absolu.
-                def uniqueId = bat(returnStdout: true, script: 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -Command "Get-Date -Format yyyyMMddHHmmss"').trim()
+                // Utilise la commande 'bat' pour exécuter 'powershell.exe' via 'cmd.exe'.
+                // C'est une approche plus robuste si 'powershell' n'est pas directement trouvable par le pas 'powershell'.
+                def uniqueId = bat(returnStdout: true, script: 'cmd /c "powershell -Command \"Get-Date -FormatyyyyMMddHHmmss\""').trim()
                 def failureBranchName = "failures/${env.BUILD_NUMBER}-${uniqueId}" // Exemple: failures/15-20250622173000
 
                 // Récupère le SHA (identifiant unique) du commit qui a été testé et qui a causé l'échec.

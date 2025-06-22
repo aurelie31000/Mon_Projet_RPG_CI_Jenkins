@@ -11,7 +11,7 @@ pipeline {
     // Ici, on récupère le Personal Access Token (PAT) GitHub que vous avez configuré dans Jenkins.
     // L'ID 'github-pat' DOIT correspondre à l'ID que vous avez donné à votre Secret text credential dans Jenkins.
     environment {
-        GITHUB_TOKEN = credentials('github-pat') // Utilise l'ID 'github-pat' que vous avez défini à l'étape 1.
+        GITHUB_TOKEN = credentials('github-pat') // Utilise l'ID 'github-pat' que vous avez défini.
     }
 
     // La section 'stages' contient les différentes phases de votre pipeline CI/CD.
@@ -32,10 +32,11 @@ pipeline {
             steps {
                 echo 'Installing Python dependencies (pytest)...'
                 // Crée un environnement virtuel Python pour isoler les dépendances du projet.
-                // '||' est utilisé comme un "OU" logique : si 'python3 -m venv' échoue, il essaiera 'python -m venv'.
-                sh 'python3 -m venv venv || python -m venv venv'
-                // Active l'environnement virtuel et installe 'pytest', nécessaire pour vos tests.
-                sh 'source venv/bin/activate && pip install pytest'
+                // Utilise 'bat' pour les commandes Windows.
+                // 'python -m venv venv' créera le dossier 'venv' contenant l'environnement.
+                bat 'python -m venv venv'
+                // Installe 'pytest' directement dans l'environnement virtuel en utilisant le pip de l'environnement.
+                bat 'venv\\Scripts\\pip install pytest'
             }
         }
 
@@ -44,11 +45,12 @@ pipeline {
             steps {
                 echo 'Running Python tests...'
                 // Exécute pytest à partir de l'environnement virtuel sur le dossier 'tests/'.
-                sh 'source venv/bin/activate && python -m pytest tests/'
+                // Utilise le python de l'environnement virtuel.
+                bat 'venv\\Scripts\\python -m pytest tests\\'
             }
         }
 
-        // Étape 4 : Fusion vers la branche 'main' (en cas de succès des tests) [cite: Capture d’écran 2025-05-22 à 09.52.12.png, Capture d’écran 2025-06-16 à 11.31.22.png]
+        // Étape 4 : Fusion vers la branche 'main' (en cas de succès des tests)
         stage('Merge to Main (Fast-Forward)') {
             // La directive 'when' garantit que cette étape ne s'exécute que si toutes les étapes précédentes
             // (notamment les tests) ont réussi. 'currentBuild.result == null' signifie "en cours" (donc pas encore d'échec),
@@ -60,21 +62,22 @@ pipeline {
                 echo 'Tests passed. Merging dev into main (fast-forward)...'
                 script {
                     // Configure l'utilisateur Git pour que les commits effectués par Jenkins soient identifiables.
-                    sh 'git config user.email "jenkins@example.com"'
-                    sh 'git config user.name "Jenkins CI Bot"'
+                    // Utilise 'bat' pour les commandes Windows.
+                    bat 'git config user.email "jenkins@example.com"'
+                    bat 'git config user.name "Jenkins CI Bot"'
 
                     // Récupère la dernière version de 'main' pour s'assurer qu'elle est à jour localement.
-                    sh 'git checkout main'
-                    sh 'git pull origin main'
+                    bat 'git checkout main'
+                    bat 'git pull origin main'
 
                     // Tente une fusion 'fast-forward' de 'dev' dans 'main'.
                     // L'option '--ff-only' empêche une fusion "non fast-forward" qui créerait un commit de fusion.
-                    // Cela garantit un historique linéaire si possible. [cite: Capture d’écran 2025-05-22 à 09.52.12.png, Capture d’écran 2025-06-16 à 11.31.22.png]
-                    sh 'git merge --ff-only dev'
+                    // Cela garantit un historique linéaire si possible.
+                    bat 'git merge --ff-only dev'
 
                     // Pousse les changements de 'main' vers le dépôt distant sur GitHub.
                     // L'authentification utilise le PAT (GITHUB_TOKEN) via l'URL HTTPS avec oauth2.
-                    sh "git push https://oauth2:${GITHUB_TOKEN}@github.com/aurelie31000/Mon_Projet_RPG_CI_Jenkins.git main"
+                    bat "git push https://oauth2:${GITHUB_TOKEN}@github.com/aurelie31000/Mon_Projet_RPG_CI_Jenkins.git main"
                     echo 'Main branch updated successfully!'
                 }
             }
@@ -92,33 +95,34 @@ pipeline {
         success {
             echo 'Build successful.'
         }
-        // Exécuté si le pipeline a échoué (par exemple, si les tests ont échoué). [cite: Capture d’écran 2025-05-22 à 09.52.12.png, Capture d’écran 2025-06-16 à 11.31.22.png]
+        // Exécuté si le pipeline a échoué (par exemple, si les tests ont échoué).
         failure {
             echo 'Build failed! Handling the failed commit...'
             script {
+                // Assurez-vous que Python est bien installé sur la machine où tourne votre agent Jenkins, et que la commande python est accessible via le PATH système.
+
                 // Génère un identifiant unique pour la branche d'échec (horodatage + numéro de build Jenkins).
-                def uniqueId = sh(returnStdout: true, script: 'date +%Y%m%d%H%M%S').trim()
-                def failureBranchName = "failures/${env.BUILD_NUMBER}-${uniqueId}" // Exemple: failures/15-20250622173000 [cite: Capture d’écran 2025-05-22 à 09.52.12.png]
+                // Utilise 'powershell' pour obtenir l'horodatage sur Windows.
+                def uniqueId = powershell(returnStdout: true, script: 'Get-Date -Format माननेMMddHHmmss').trim()
+                def failureBranchName = "failures/${env.BUILD_NUMBER}-${uniqueId}" // Exemple: failures/15-20250622173000
 
                 // Récupère le SHA (identifiant unique) du commit qui a été testé et qui a causé l'échec.
                 // Il est crucial de le faire AVANT de réinitialiser la branche 'dev'.
-                def failedCommitSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
+                bat 'git checkout dev' // Assurez-vous d'être sur la branche 'dev' pour obtenir le bon HEAD
+                def failedCommitSha = bat(returnStdout: true, script: 'git rev-parse HEAD').trim()
 
-                // Revenir sur la branche 'dev' localement.
-                sh 'git checkout dev'
                 // Réinitialise la branche 'dev' au commit précédent. Cela "retire" le commit en échec de 'dev'.
-                // Cela correspond à la notion de 'git reset HEAD@{1}' du diagramme. [cite: Capture d’écran 2025-05-22 à 09.52.12.png, Capture d’écran 2025-06-16 à 11.31.22.png]
-                sh 'git reset --hard HEAD^' 
+                bat 'git reset --hard HEAD^'
 
                 // Pousse de force la branche 'dev' réinitialisée vers GitHub.
                 // Le '--force' est nécessaire car l'historique de 'dev' a été réécrit localement.
-                sh 'git push https://oauth2:${GITHUB_TOKEN}@github.com/aurelie31000/Mon_Projet_RPG_CI_Jenkins.git dev --force'
+                bat 'git push https://oauth2:${GITHUB_TOKEN}@github.com/aurelie31000/Mon_Projet_RPG_CI_Jenkins.git dev --force'
 
                 // Crée une nouvelle branche sous 'failures/' à partir du commit qui a échoué,
                 // et la pousse vers GitHub. Cela permet de conserver l'historique du commit défectueux
-                // sans qu'il ne bloque la branche 'dev'. [cite: Capture d’écran 2025-05-22 à 09.52.12.png]
-                sh "git push https://oauth2:${GITHUB_TOKEN}@github.com/aurelie31000/Mon_Projet_RPG_CI_Jenkins.git ${failedCommitSha}:${failureBranchName}"
-                
+                // sans qu'il ne bloque la branche 'dev'.
+                bat "git push https://oauth2:${GITHUB_TOKEN}@github.com/aurelie31000/Mon_Projet_RPG_CI_Jenkins.git ${failedCommitSha}:${failureBranchName}"
+
                 echo "Failure branch ${failureBranchName} created from failed commit ${failedCommitSha}. Dev branch reset and forced pushed."
             }
         }

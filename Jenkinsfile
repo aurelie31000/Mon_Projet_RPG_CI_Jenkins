@@ -82,7 +82,8 @@ pipeline {
                     // CORRECTION : Utilise '-B' pour s'assurer que la branche locale 'principal' est bien
                     // mise à jour ou créée à partir de 'origin/principal', puis basculée.
                     bat 'git checkout -B principal origin/principal'
-                    bat 'git pull origin principal' # Pull en plus pour être sûr
+                    // Pull en plus pour être sûr
+                    bat 'git pull origin principal' 
 
                     // Tente une fusion 'fast-forward' de 'dev' dans 'principal'.
                     // L'option '--ff-only' empêche une fusion "non fast-forward" qui créerait un commit de fusion.

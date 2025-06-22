@@ -12,10 +12,10 @@ pipeline {
     // L'ID 'github-pat' DOIT correspondre à l'ID que vous avez donné à votre Secret text credential dans Jenkins.
     environment {
         GITHUB_TOKEN = credentials('github-pat') // Utilise l'ID 'github-pat' que vous avez défini.
-        // AJOUT : Ajoute les chemins de Python et PowerShell au PATH pour le pipeline Jenkins
-        // REMPLACEZ 'C:\VOTRE\CHEMIN\VERS\PYTHON' et 'C:\VOTRE\CHEMIN\VERS\POWERSHELL' par les VRAIS chemins que vous avez trouvés.
-        // N'oubliez pas d'inclure le dossier 'Scripts' de Python si `pip` est nécessaire !
-        PATH = "C:\\Users\\sihem\\AppData\\Local\\Programs\\Python\\Python39;C:\\Users\\sihem\\AppData\\Local\\Programs\\Python\\Python39\\Scripts;C:\\Windows\\System32\\WindowsPowerShell\\v1.0;${env.PATH}"
+        // REMARQUE : La modification explicite du PATH dans l'environnement global du pipeline
+        // a été retirée car elle ne semblait pas être appliquée de manière fiable par les steps 'bat'/'powershell'.
+        // Nous allons utiliser les chemins absolus directement ou nous assurer que les exécutables sont dans le PATH système
+        // de l'agent Jenkins ou utiliser des chemins relatifs au workspace si applicable.
     }
 
     // La section 'stages' contient les différentes phases de votre pipeline CI/CD.
@@ -36,9 +36,9 @@ pipeline {
             steps {
                 echo 'Installing Python dependencies (pytest)...'
                 // Crée un environnement virtuel Python pour isoler les dépendances du projet.
-                // Utilise 'bat' pour les commandes Windows.
-                // 'python -m venv venv' créera le dossier 'venv' contenant l'environnement.
-                bat 'python -m venv venv'
+                // Utilise le chemin absolu pour 'python.exe' pour garantir qu'il est trouvé.
+                // Assurez-vous que ce chemin est correct pour votre installation Python.
+                bat 'C:\\Users\\sihem\\AppData\\Local\\Programs\\Python\\Python39\\python.exe -m venv venv'
                 // Installe 'pytest' directement dans l'environnement virtuel en utilisant le pip de l'environnement.
                 bat 'venv\\Scripts\\pip install pytest'
             }
@@ -49,7 +49,7 @@ pipeline {
             steps {
                 echo 'Running Python tests...'
                 // Exécute pytest à partir de l'environnement virtuel sur le dossier 'tests/'.
-                // Utilise le python de l'environnement virtuel.
+                // Utilise le python de l'environnement virtuel (chemin relatif au workspace).
                 bat 'venv\\Scripts\\python -m pytest tests\\'
             }
         }
@@ -71,6 +71,7 @@ pipeline {
                     bat 'git config user.name "Jenkins CI Bot"'
 
                     // Récupère la dernière version de 'main' pour s'assurer qu'elle est à jour localement.
+                    // CORRECTION : Changement de 'principal' à 'main' pour le nom de branche.
                     bat 'git checkout main'
                     bat 'git pull origin main'
 
@@ -104,8 +105,8 @@ pipeline {
             echo 'Build failed! Handling the failed commit...'
             script {
                 // Génère un identifiant unique pour la branche d'échec (horodatage + numéro de build Jenkins).
-                // CORRECTION : Correction de la faute de frappe dans le format de date PowerShell.
-                def uniqueId = powershell(returnStdout: true, script: 'Get-Date -Format yyyyMMddHHmmss').trim()
+                // Utilise la commande 'bat' pour exécuter 'powershell.exe' avec son chemin absolu.
+                def uniqueId = bat(returnStdout: true, script: 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -Command "Get-Date -Format yyyyMMddHHmmss"').trim()
                 def failureBranchName = "failures/${env.BUILD_NUMBER}-${uniqueId}" // Exemple: failures/15-20250622173000
 
                 // Récupère le SHA (identifiant unique) du commit qui a été testé et qui a causé l'échec.

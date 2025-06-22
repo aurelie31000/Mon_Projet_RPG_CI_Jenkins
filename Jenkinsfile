@@ -54,8 +54,8 @@ pipeline {
             }
         }
 
-        // Étape 4 : Fusion vers la branche 'main' (en cas de succès des tests)
-        stage('Merge to Main (Fast-Forward)') {
+        // Étape 4 : Fusion vers la branche 'principal' (en cas de succès des tests)
+        stage('Merge to Principal (Fast-Forward)') {
             // La directive 'when' garantit que cette étape ne s'exécute que si toutes les étapes précédentes
             // (notamment les tests) ont réussi. 'currentBuild.result == null' signifie "en cours" (donc pas encore d'échec),
             // et 'currentBuild.result == 'SUCCESS'' signifie que le build a réussi jusqu'à présent.
@@ -63,7 +63,7 @@ pipeline {
                 expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
             }
             steps {
-                echo 'Tests passed. Merging dev into main (fast-forward)...'
+                echo 'Tests passed. Merging dev into principal (fast-forward)...'
                 script {
                     // Configure l'utilisateur Git pour que les commits effectués par Jenkins soient identifiables.
                     // Utilise 'bat' pour les commandes Windows.
@@ -74,20 +74,20 @@ pipeline {
                     echo 'Listing all branches in the repository:'
                     bat 'git branch -a'
 
-                    // Récupère la dernière version de 'main' pour s'assurer qu'elle est à jour localement.
-                    // Cible maintenant la branche 'main' comme convenu.
-                    bat 'git checkout main'
-                    bat 'git pull origin main'
+                    // Récupère la dernière version de 'principal' pour s'assurer qu'elle est à jour localement.
+                    // CORRECTION : Cible maintenant la branche 'principal' comme confirmé par 'git branch -a'.
+                    bat 'git checkout principal'
+                    bat 'git pull origin principal'
 
-                    // Tente une fusion 'fast-forward' de 'dev' dans 'main'.
+                    // Tente une fusion 'fast-forward' de 'dev' dans 'principal'.
                     // L'option '--ff-only' empêche une fusion "non fast-forward" qui créerait un commit de fusion.
                     // Cela garantit un historique linéaire si possible.
                     bat 'git merge --ff-only dev'
 
-                    // Pousse les changements de 'main' vers le dépôt distant sur GitHub.
+                    // Pousse les changements de 'principal' vers le dépôt distant sur GitHub.
                     // L'authentification utilise le PAT (GITHUB_TOKEN) via l'URL HTTPS avec oauth2.
-                    bat "git push https://oauth2:${GITHUB_TOKEN}@github.com/aurelie31000/Mon_Projet_RPG_CI_Jenkins.git main"
-                    echo 'Main branch updated successfully!'
+                    bat "git push https://oauth2:${GITHUB_TOKEN}@github.com/aurelie31000/Mon_Projet_RPG_CI_Jenkins.git principal"
+                    echo 'Principal branch updated successfully!'
                 }
             }
         }
@@ -109,9 +109,17 @@ pipeline {
             echo 'Build failed! Handling the failed commit...'
             script {
                 // Génère un identifiant unique pour la branche d'échec (horodatage + numéro de build Jenkins).
-                // Utilise la commande 'bat' pour exécuter 'powershell.exe' via 'cmd.exe'.
-                // C'est une approche plus robuste si 'powershell' n'est pas directement trouvable par le pas 'powershell'.
-                def uniqueId = bat(returnStdout: true, script: 'cmd /c "powershell -Command \\"Get-Date -FormatyyyyMMddHHmmss\\""').trim()
+                // CORRECTION : Utilise des commandes BAT robustes pour obtenir la date/heure sans PowerShell.
+                def date_cmd = "for /f \"tokens=1-4 delims=/ \" %%i in ('date /t') do set current_date=%%l%%k%%j" // Format YYYYMMDD
+                def time_cmd = "for /f \"tokens=1-2 delims=:. \" %%a in ('time /t') do set current_time=%%a%%b" // Format HHMM (AM/PM à gérer si nécessaire)
+                // Note : Time /t peut inclure AM/PM, il faudra peut-être une logique supplémentaire
+                // pour gérer cela si l'heure est en format 12h. Pour l'instant, on suppose 24h ou format simple.
+                def uniqueId = bat(returnStdout: true, script: """
+                    ${date_cmd}
+                    ${time_cmd}
+                    echo %current_date%%current_time%
+                """).trim()
+
                 def failureBranchName = "failures/${env.BUILD_NUMBER}-${uniqueId}" // Exemple: failures/15-20250622173000
 
                 // Récupère le SHA (identifiant unique) du commit qui a été testé et qui a causé l'échec.

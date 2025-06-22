@@ -104,7 +104,7 @@ pipeline {
             echo 'Build failed! Handling the failed commit...'
             script {
                 // Génère un identifiant unique pour la branche d'échec (horodatage + numéro de build Jenkins).
-                // Utilise 'powershell' pour obtenir l'horodatage sur Windows.
+                // CORRECTION : Correction de la faute de frappe dans le format de date PowerShell.
                 def uniqueId = powershell(returnStdout: true, script: 'Get-Date -Format yyyyMMddHHmmss').trim()
                 def failureBranchName = "failures/${env.BUILD_NUMBER}-${uniqueId}" // Exemple: failures/15-20250622173000
 

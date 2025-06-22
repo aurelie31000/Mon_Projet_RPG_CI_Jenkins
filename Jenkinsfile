@@ -1,5 +1,9 @@
 // Jenkinsfile
 
+// Importation nécessaire pour la gestion des dates en Groovy
+import java.text.SimpleDateFormat
+import java.util.Date
+
 // L'ensemble du pipeline est encapsulé dans un bloc 'pipeline'.
 // C'est la structure déclarative standard.
 pipeline {
@@ -75,9 +79,10 @@ pipeline {
                     bat 'git branch -a'
 
                     // Récupère la dernière version de 'principal' pour s'assurer qu'elle est à jour localement.
-                    // CORRECTION : Cible maintenant la branche 'principal' comme confirmé par 'git branch -a'.
-                    bat 'git checkout principal'
-                    bat 'git pull origin principal'
+                    // CORRECTION : Utilise '-B' pour s'assurer que la branche locale 'principal' est bien
+                    // mise à jour ou créée à partir de 'origin/principal', puis basculée.
+                    bat 'git checkout -B principal origin/principal'
+                    bat 'git pull origin principal' # Pull en plus pour être sûr
 
                     // Tente une fusion 'fast-forward' de 'dev' dans 'principal'.
                     // L'option '--ff-only' empêche une fusion "non fast-forward" qui créerait un commit de fusion.
@@ -109,16 +114,10 @@ pipeline {
             echo 'Build failed! Handling the failed commit...'
             script {
                 // Génère un identifiant unique pour la branche d'échec (horodatage + numéro de build Jenkins).
-                // CORRECTION : Utilise des commandes BAT robustes pour obtenir la date/heure sans PowerShell.
-                def date_cmd = "for /f \"tokens=1-4 delims=/ \" %%i in ('date /t') do set current_date=%%l%%k%%j" // Format YYYYMMDD
-                def time_cmd = "for /f \"tokens=1-2 delims=:. \" %%a in ('time /t') do set current_time=%%a%%b" // Format HHMM (AM/PM à gérer si nécessaire)
-                // Note : Time /t peut inclure AM/PM, il faudra peut-être une logique supplémentaire
-                // pour gérer cela si l'heure est en format 12h. Pour l'instant, on suppose 24h ou format simple.
-                def uniqueId = bat(returnStdout: true, script: """
-                    ${date_cmd}
-                    ${time_cmd}
-                    echo %current_date%%current_time%
-                """).trim()
+                // CORRECTION : Utilise les fonctionnalités natives de Groovy/Jenkins pour la date.
+                def now = new Date(currentBuild.timestamp)
+                def sdf = new SimpleDateFormat("yyyyMMddHHmmss")
+                def uniqueId = sdf.format(now)
 
                 def failureBranchName = "failures/${env.BUILD_NUMBER}-${uniqueId}" // Exemple: failures/15-20250622173000
 
